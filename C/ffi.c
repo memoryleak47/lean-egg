@@ -1,5 +1,7 @@
 #include <lean/lean.h>
 #include <stdio.h>
+#include <string.h>
+#include <unistd.h>
 
 size_t nat_from_lean_obj(lean_obj_arg nat) {
     assert(lean_is_scalar(nat));
@@ -432,4 +434,8 @@ lean_obj_res explain_equiv(b_lean_obj_arg graph, uint8_t slotted, lean_obj_arg i
         egg_egraph graph_c = to_egg_egraph(graph);
         return lean_mk_string(egg_query_equiv(graph_c, init_c, goal_c));
     }
+}
+
+int foo(char* s, int len) {
+    printf("foo called!");
 }

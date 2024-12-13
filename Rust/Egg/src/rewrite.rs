@@ -46,6 +46,11 @@ struct LeanApplier {
 impl Applier<LeanExpr, LeanAnalysis> for LeanApplier {
 
     fn apply_one(&self, graph: &mut LeanEGraph, lhs: Id, subst: &Subst, searcher_ast: Option<&PatternAst<LeanExpr>>, rule: Symbol) -> Vec<Id> {
+        unsafe {
+            let s = "ok";
+            crate::foo("ok".as_ptr() as _, s.len() as _);
+        }
+
         // Disallows rewriting on primitive e-nodes.
         if graph[lhs].data.is_primitive { return vec![] }
         
