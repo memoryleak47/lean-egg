@@ -11,6 +11,8 @@ use basic::*;
 use result::*;
 use rewrite::*;
 
+mod scheduler;
+
 mod activation;
 mod analysis;
 mod basic;

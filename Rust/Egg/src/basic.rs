@@ -56,15 +56,30 @@ pub fn explain_congr(
         egraph.union_instantiations(&eq.lhs, &eq.rhs, &Subst::with_capacity(0), eq.name); 
     }
 
+    let (mut egraph, report, rw_stats) = eqsat(egraph, init_id, goal_id, &cfg, viz_path, &rws);
+    let (kind, expl) = mk_explanation(&mut egraph, init_expr, goal_expr, init_id, goal_id);
+    Ok(ExplainedCongr { kind, expl, egraph, report, rw_stats, activations })
+}
+
+fn eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_path: Option<String>, rws: &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
     let runner = mk_runner(egraph, init_id, goal_id, &cfg, viz_path);
-    let start_time = Instant::now();
-    let mut runner = runner.run(&rws);
-    let total_time = start_time.elapsed();
-    let mut report = runner.report();
-    report.total_time = total_time.as_secs_f64();
+
+    let time_limit = Duration::from_secs(cfg.time_limit as _);
+    let limits = crate::scheduler::Limits {
+        time_limit,
+        node_limit: cfg.node_limit,
+    };
+    let cfg = crate::scheduler::CostConfig {
+        cf: |_| 1,
+        offset: 100,
+        unreachable_cost: 10_000,
+    };
+    let runner = crate::scheduler::run(runner, &rws, limits, cfg);
+    let report = runner.report();
+
     let rw_stats = collect_rw_stats(&runner);
-    let (kind, expl) = mk_explanation(&mut runner.egraph, init_expr, goal_expr, init_id, goal_id);
-    Ok(ExplainedCongr { kind, expl, egraph: runner.egraph, report, rw_stats, activations })
+
+    (runner.egraph, report, rw_stats)
 }
 
 struct Initialized {
@@ -180,6 +195,9 @@ fn mk_runner(
         .with_time_limit(Duration::from_secs(cfg.time_limit.try_into().unwrap()))
         .with_node_limit(cfg.node_limit)
         .with_iter_limit(cfg.iter_limit)
+        // NOTE: We want to just check how low we get root extraction costs. Hence, this would be an unfair early return.
+        // This obviously implies that we won't find any proofs ever, but that's not what we're measuring for right now.
+        /*
         .with_hook(move |runner| {
             // Note: `lookup` returns a canonicalized id.
             if runner.egraph.lookup(LeanExpr::Eq([init_id, goal_id])) == Some(runner.egraph.find(true_id)) {
@@ -188,6 +206,7 @@ fn mk_runner(
                 Ok(())
             }   
         })
+        */
         .with_hook(move |runner| {
             let ex = Extractor::new(&runner.egraph, AstSize);
             let ex_map: HashMap<Id, LeanExpr> = runner.egraph.classes()
@@ -209,6 +228,11 @@ fn mk_runner(
             runner.egraph.rebuild();
             Ok(())
         });
+
+    runner.roots.push(init_id);
+    if init_id != goal_id {
+        runner.roots.push(goal_id);
+    }
 
     if let Some(path) = viz_path {
         runner = runner.with_hook(move |runner| {
