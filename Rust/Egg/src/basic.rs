@@ -94,13 +94,24 @@ fn detour_eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_
         // Note: `lookup` returns a canonicalized id.
         if egraph.lookup(LeanExpr::Eq([init_id, goal_id])) == Some(egraph.find(true_id)) { return Err(format!("Goal reached!")); }
 
-        let ids = egraph.classes().map(|x| x.id).collect::<Vec<_>>();
-        for class in ids {
-            if is_primitive(class, &egraph) { continue }
-            let (_, rep) = Extractor::new(&egraph, AstSize).find_best(class);
+        let ex = Extractor::new(egraph, AstSize);
+        let ex_map: HashMap<Id, LeanExpr> = egraph.classes()
+            .map(|x| x.id)
+            .map(|x| (x, ex.find_best_node(x).clone()))
+            .collect();
+        drop(ex);
+
+        let classes: Box<[Id]> = egraph.classes()
+            .map(|x| x.id)
+            .filter(|x| !is_primitive(*x, egraph))
+            .collect();
+
+        for x in classes {
+            let rep = build_expr(x, &ex_map);
             let eq_expr = format!("(= {} {})", rep, rep).parse().unwrap();
             egraph.union_instantiations(&eq_expr, &true_expr, &Subst::with_capacity(0), "=");
         }
+
         egraph.rebuild();
         Ok(())
     });
