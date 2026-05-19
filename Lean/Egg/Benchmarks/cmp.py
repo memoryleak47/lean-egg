@@ -2,8 +2,12 @@
 
 import sys
 
-detour_lines = open(sys.argv[2]).readlines()
-original_lines = open(sys.argv[3]).readlines()
+def read(x):
+    lines = open(x).readlines()
+    return list(filter(lambda c: c.strip(), lines))
+
+detour_lines = read(sys.argv[2])
+original_lines = read(sys.argv[3])
 
 GREEN = "\033[32m"
 RED = "\033[31m"
