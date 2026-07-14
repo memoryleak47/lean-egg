@@ -56,73 +56,35 @@ pub fn explain_congr(
         egraph.union_instantiations(&eq.lhs, &eq.rhs, &Subst::with_capacity(0), eq.name); 
     }
 
-    let (mut egraph, report, rw_stats) = eqsat_fn()(egraph, init_id, goal_id, &cfg, viz_path, &rws);
+    let (mut egraph, report, rw_stats) = eqsat(egraph, init_id, goal_id, &cfg, viz_path, &rws);
     let (kind, expl) = mk_explanation(&mut egraph, init_expr, goal_expr, init_id, goal_id);
     Ok(ExplainedCongr { kind, expl, egraph, report, rw_stats, activations })
 }
 
-fn eqsat_fn() -> fn(LeanEGraph, Id, Id, cfg: &Config, Option<String>, &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
-    match &*std::env::var("EQSAT_FN").unwrap_or(String::new()) {
-        "detour" => detour_eqsat,
-        "original" => original_eqsat,
-        x => panic!("unknown EQSAT_FN {x}"),
-    }
-}
-
-
-
-fn original_eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_path: Option<String>, rws: &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
+fn eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_path: Option<String>, rws: &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
     let runner = mk_runner(egraph, init_id, goal_id, &cfg, viz_path);
     let start_time = Instant::now();
     let runner = runner.run(rws);
     let total_time = start_time.elapsed();
     let mut report = runner.report();
     report.total_time = total_time.as_secs_f64();
+
+    let time_limit = Duration::from_secs(cfg.time_limit as _);
+    let limits = crate::scheduler::Limits {
+        time_limit,
+        node_limit: cfg.node_limit,
+    };
+    let cfg = crate::scheduler::CostConfig {
+        cf: |_| 1,
+        offset: 100,
+        unreachable_cost: 10_000,
+    };
+    let runner = crate::scheduler::run(runner, &rws, limits, cfg);
+    let report = runner.report();
+
     let rw_stats = collect_rw_stats(&runner);
 
     (runner.egraph, report, rw_stats)
-}
-
-fn detour_eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_path: Option<String>, rws: &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
-    let mut egraph = egraph;
-
-    let true_expr = "(const \"True\")".parse().unwrap();
-    let true_id = egraph.lookup_expr(&"(const \"True\")".parse().unwrap()).unwrap();
-
-    let roots = &[init_id, goal_id];
-    let hook = Box::new(move |egraph: &mut EGraph<_, _>| {
-        // Note: `lookup` returns a canonicalized id.
-        if egraph.lookup(LeanExpr::Eq([init_id, goal_id])) == Some(egraph.find(true_id)) { return Err(format!("Goal reached!")); }
-
-        let ex = Extractor::new(egraph, AstSize);
-        let ex_map: HashMap<Id, LeanExpr> = egraph.classes()
-            .map(|x| x.id)
-            .map(|x| (x, ex.find_best_node(x).clone()))
-            .collect();
-        drop(ex);
-
-        let classes: Box<[Id]> = egraph.classes()
-            .map(|x| x.id)
-            .filter(|x| !is_primitive(*x, egraph))
-            .collect();
-
-        for x in classes {
-            let rep = build_expr(x, &ex_map);
-            let eq_expr = format!("(= {} {})", rep, rep).parse().unwrap();
-            egraph.union_instantiations(&eq_expr, &true_expr, &Subst::with_capacity(0), "=");
-        }
-
-        egraph.rebuild();
-        Ok(())
-    });
-    let ast_size: for<'a> fn(&'a LeanExpr) -> u128 = |_|1;
-    let offset = 100;
-    let unreachable_cost = 10000;
-    let time_limit = Duration::from_secs(cfg.time_limit as _);
-    let report = crate::detour::detour_run(roots, rws, &mut egraph, &mut [hook], time_limit, cfg.node_limit, ast_size, offset, unreachable_cost);
-
-    let rw_stats = format!("<no rw_stats>"); // fake stats
-    (egraph, report, rw_stats)
 }
 
 struct Initialized {
