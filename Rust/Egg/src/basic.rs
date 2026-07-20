@@ -63,11 +63,6 @@ pub fn explain_congr(
 
 fn eqsat(egraph: LeanEGraph, init_id: Id, goal_id: Id, cfg: &Config, viz_path: Option<String>, rws: &[LeanRewrite]) -> (LeanEGraph, Report, /*rw_stats*/ String) {
     let runner = mk_runner(egraph, init_id, goal_id, &cfg, viz_path);
-    let start_time = Instant::now();
-    let runner = runner.run(rws);
-    let total_time = start_time.elapsed();
-    let mut report = runner.report();
-    report.total_time = total_time.as_secs_f64();
 
     let time_limit = Duration::from_secs(cfg.time_limit as _);
     let limits = crate::scheduler::Limits {
