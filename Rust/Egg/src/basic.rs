@@ -225,6 +225,11 @@ fn mk_runner(
             Ok(())
         });
 
+    runner.roots.push(init_id);
+    if init_id != goal_id {
+        runner.roots.push(goal_id);
+    }
+
     if let Some(path) = viz_path {
         runner = runner.with_hook(move |runner| {
             runner.egraph.dot().to_dot(format!("{}/{}.dot", path, runner.iterations.len())).unwrap();
