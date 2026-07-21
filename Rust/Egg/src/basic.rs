@@ -195,6 +195,9 @@ fn mk_runner(
         .with_time_limit(Duration::from_secs(cfg.time_limit.try_into().unwrap()))
         .with_node_limit(cfg.node_limit)
         .with_iter_limit(cfg.iter_limit)
+        // NOTE: We want to just check how low we get root extraction costs. Hence, this would be an unfair early return.
+        // This obviously implies that we won't find any proofs ever, but that's not what we're measuring for right now.
+        /*
         .with_hook(move |runner| {
             // Note: `lookup` returns a canonicalized id.
             if runner.egraph.lookup(LeanExpr::Eq([init_id, goal_id])) == Some(runner.egraph.find(true_id)) {
@@ -203,6 +206,7 @@ fn mk_runner(
                 Ok(())
             }   
         })
+        */
         .with_hook(move |runner| {
             let ex = Extractor::new(&runner.egraph, AstSize);
             let ex_map: HashMap<Id, LeanExpr> = runner.egraph.classes()
