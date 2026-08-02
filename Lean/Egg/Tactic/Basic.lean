@@ -86,7 +86,10 @@ where
     let req ← Request.encoding goal.toCongr rules guides blocks cfg
     withTraceNode `egg.encoded (fun _ => return "Encoded") do req.trace `egg.encoded
     if let .beforeEqSat := cfg.exitPoint then return none
-    let result ← req.run cfg.explLengthLimit (onEqSatFailure cfg)
+    -- For the scheduler gym: skip any postprocessing.
+    let _ ← req.runRaw
+    return none
+    /-
     result.expl.trace `egg.explanation.steps
     if let .beforeProof := cfg.exitPoint then return none
     let beforeProof ← IO.monoMsNow
@@ -95,6 +98,7 @@ where
       let proofTime := (← IO.monoMsNow) - beforeProof
       return some (prf, proofTime, result)
     | .retryWithShapes => runEqSat goal rules guides blocks { cfg with shapes := true }
+    -/
   onEqSatFailure (cfg : Config) (report : Request.Result.Report) : Request.Failure → MetaM MessageData
     | .backend msg? => do
       let mut msg := msg?

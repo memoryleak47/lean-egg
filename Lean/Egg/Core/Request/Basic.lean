@@ -119,7 +119,7 @@ deriving Inhabited
 
 set_option compiler.ignoreBorrowAnnotation true in
 @[extern "run_eqsat_request"]
-private opaque runRaw (req : Request) : MetaM Result.Raw
+opaque runRaw (req : Request) : MetaM Result.Raw
 
 structure Result where
   expl   : Explanation
