@@ -69,8 +69,8 @@ process_output() {
 
 # Check for --noclean flag
 if [[ "$1" != "--noclean" ]]; then
-    (cd ../../.. && lake clean && lake build) > /dev/null 2>&1
-    (cd Math && lake clean && lake exec cache get && lake build) > /dev/null 2>&1
+    (cd ../../.. && lake clean && lake build)
+    (cd Math && lake clean && lake exec cache get && lake build)
 fi
 
 echo -e "\rSource,Total Time (ms),Eqsat Time (ms),Proof Time (ms),Iterations,E-Nodes,E-Classes,Explanation Length"
@@ -78,7 +78,7 @@ echo -e "\rSource,Total Time (ms),Eqsat Time (ms),Proof Time (ms),Iterations,E-N
 for file in *.lean; do
     name="${file%.lean}"
     module="Egg.Benchmarks.«${name}»"
-    (cd ../../.. && lake build "$module" 2>&1) | process_output
+    (cd ../../.. && lake build "$module")
 done
 
 cd Math/Math
@@ -86,5 +86,5 @@ cd Math/Math
 for file in *.lean; do
     name="${file%.lean}"
     module="Math.«${name}»"
-    (cd .. && lake build "$module" 2>&1) | process_output
+    (cd .. && lake build "$module")
 done
