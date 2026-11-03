@@ -48,7 +48,7 @@ pub fn explain_congr(
 ) -> Result<ExplainedCongr, Error> {    
     let init = mk_initial_egraph(init, goal, guides, &cfg)?;
     let activations = get_activations(&init, &rw_templates);
-    let Initialized { mut egraph, init_id, init_expr, goal_id, goal_expr, guide_exprs: _ } = init;
+    let Initialized { mut egraph, init_id, init_expr: _, goal_id, goal_expr: _, guide_exprs: _ } = init;
     let (eqs, rws) = mk_rewrites(rw_templates, &cfg, &activations, env)?;
 
     // Adds ground equalities to the e-graph.
@@ -56,8 +56,10 @@ pub fn explain_congr(
         egraph.union_instantiations(&eq.lhs, &eq.rhs, &Subst::with_capacity(0), eq.name); 
     }
 
-    let (mut egraph, report, rw_stats) = eqsat(egraph, init_id, goal_id, &cfg, viz_path, &rws);
-    let (kind, expl) = mk_explanation(&mut egraph, init_expr, goal_expr, init_id, goal_id);
+    let (egraph, report, rw_stats) = eqsat(egraph, init_id, goal_id, &cfg, viz_path, &rws);
+    // For the scheduler gym: skip explanations, the Lean side discards them anyway and
+    // flattening them can blow up (e.g. Math/Rotman under detour-rhs-300).
+    let (kind, expl) = (ExplanationKind::None, String::new());
     Ok(ExplainedCongr { kind, expl, egraph, report, rw_stats, activations })
 }
 

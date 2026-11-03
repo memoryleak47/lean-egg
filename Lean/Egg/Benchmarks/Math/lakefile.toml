@@ -14,3 +14,5 @@ path = "../../../.."
 
 [[lean_lib]]
 name = "Math"
+# like the Egg lib: no parallel elaboration, so eqsat runs happen in a fixed order
+leanOptions = {Elab.async = false}
