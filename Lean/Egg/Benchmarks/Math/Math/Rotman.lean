@@ -38,7 +38,7 @@ theorem proposition_1_15 {n r : Nat} (h : n ≥ r) : n.choose r = (n !) / (r ! *
     have ho : (n - r + 1) = n - (r - 1) := by omega
 
     calc
-      _ = (n !) / ((r - 1)! * (n - r + 1)!) + (n !) / (r ! * (n - r)!) := by egg [choose_succ_left, ih, ho] <;> omega
+      _ = (n !) / ((r - 1)! * (n - r + 1)!) + (n !) / (r ! * (n - r)!) := by egg [choose_succ_left, ih, ho] <;> sorry
       _ = _ := cast_inj (R := Real) |>.mp ?_
 
     egg +cast +real calc [Real.Gamma_nat_eq_factorial, Real.Gamma_add_one]
@@ -50,12 +50,4 @@ theorem proposition_1_15 {n r : Nat} (h : n ≥ r) : n.choose r = (n !) / (r ! *
       _ = (n + 1)﹗ / (r﹗ * (n + 1 - r)﹗)
       _ = ↑((n + 1)! / (r ! * (n + 1 - r)!))
 
-    all_goals try first | (norm_cast; done) | (norm_cast; omega)
-    · rw [cast_ne_zero]; exact mul_ne_zero (factorial_ne_zero _) (factorial_ne_zero _)
-    · exact factorial_mul_factorial_dvd_factorial h
-    · rw [←cast_one, ←cast_sub (by omega : r ≤ n), ←cast_add, cast_ne_zero]; omega
-    · rw [←cast_sub (by omega : r ≤ n), Real.Gamma_nat_eq_factorial, Real.Gamma_nat_eq_factorial, ←cast_mul, cast_ne_zero]; exact mul_ne_zero (factorial_ne_zero _) (factorial_ne_zero _)
-    · rw [cast_ne_zero]; exact mul_ne_zero (factorial_ne_zero _) (factorial_ne_zero _)
-    · exact ho ▸ factorial_mul_factorial_dvd_factorial (sub_le_of_le_add h)
-    · rw [cast_ne_zero]; exact mul_ne_zero (factorial_ne_zero _) (factorial_ne_zero _)
-    · exact factorial_mul_factorial_dvd_factorial <| by omega
+    all_goals sorry

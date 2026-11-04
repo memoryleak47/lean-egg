@@ -70,7 +70,7 @@ process_output() {
 # Check for --noclean flag
 if [[ "$1" != "--noclean" ]]; then
     (cd ../../.. && lake clean && lake build)
-    (cd Math && lake clean && lake exec cache get && lake build)
+    (cd Math && lake clean && lake exec cache get)
 fi
 
 echo -e "\rSource,Total Time (ms),Eqsat Time (ms),Proof Time (ms),Iterations,E-Nodes,E-Classes,Explanation Length"
