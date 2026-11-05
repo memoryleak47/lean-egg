@@ -166,29 +166,18 @@ lean_obj_res report_to_lean(report rep) {
 }
 
 typedef void* egg_egraph;
-typedef void* slotted_egraph;
 
 extern void egg_free_egraph(egg_egraph);
-extern void slotted_free_egraph(slotted_egraph);
 
 void egg_egraph_finalize(egg_egraph obj) {
     egg_free_egraph(obj);
-}
-
-void slotted_egraph_finalize(slotted_egraph obj) {
-    slotted_free_egraph(obj);
 }
 
 void egg_egraph_foreach(egg_egraph _x, b_lean_obj_arg _y) {
     // do nothing since `egg_egraph` does not contain nested Lean objects
 }
 
-void slotted_egraph_foreach(slotted_egraph _x, b_lean_obj_arg _y) {
-    // do nothing since `slotted_egraph` does not contain nested Lean objects
-}
-
 static lean_external_class* egg_egraph_class = NULL;
-static lean_external_class* slotted_egraph_class = NULL;
 
 lean_object* egg_egraph_to_lean(egg_egraph e) {
     if (egg_egraph_class == NULL) {
@@ -197,19 +186,14 @@ lean_object* egg_egraph_to_lean(egg_egraph e) {
     return lean_alloc_external(egg_egraph_class, e);
 }
 
-lean_object* slotted_egraph_to_lean(slotted_egraph e) {
-    if (slotted_egraph_class == NULL) {
-        slotted_egraph_class = lean_register_external_class(slotted_egraph_finalize, slotted_egraph_foreach);
-    }
-    return lean_alloc_external(slotted_egraph_class, e);
-}
-
 egg_egraph to_egg_egraph(b_lean_obj_arg e) {
     return (egg_egraph)(lean_get_external_data(e));
 }
 
-slotted_egraph to_slotted_egraph(b_lean_obj_arg e) {
-    return (slotted_egraph)(lean_get_external_data(e));
+// The Slotted backend has been removed from this fork (see `lakefile.lean`).
+static void slotted_unsupported(void) {
+    fprintf(stderr, "egg: the slotted backend is not available in this build\n");
+    exit(1);
 }
 
 typedef struct egg_result {
@@ -219,30 +203,10 @@ typedef struct egg_result {
     report rep;
 } egg_result;
 
-typedef struct slotted_result {
-    char* expl;
-    slotted_egraph graph;
-    report rep;
-} slotted_result;
-
-typedef union egraph {
-    egg_egraph egg;
-    slotted_egraph slotted;
-} egraph;
-
-lean_object* egraph_to_lean(egraph e, _Bool slotted) {
-    if (slotted) {
-        return slotted_egraph_to_lean(e.slotted);
-    } else {
-        return egg_egraph_to_lean(e.egg);
-    }
-}
-
 typedef struct eqsat_result {
-    _Bool slotted;
     uint8_t kind;
     const char* expl;
-    egraph graph;
+    egg_egraph graph;
     report rep;
 } eqsat_result;
 
@@ -255,15 +219,6 @@ extern egg_result egg_explain_congr(
     config cfg,
     const char* viz_path,
     void* e
-);
-
-extern slotted_result slotted_explain_congr(
-    const char* init, 
-    const char* goal, 
-    rws_array rws, 
-    str_array guides, 
-    config cfg,
-    const char* viz_path
 );
 
 /*
@@ -285,27 +240,18 @@ eqsat_result run_eqsat_request_core(lean_obj_arg req, env* e) {
     const char* viz_path = lean_string_cstr(lean_ctor_get(req, 5));
     lean_config cfg      = config_from_lean_obj(lean_ctor_get(req, 6));
 
-    eqsat_result result;
     if (cfg.slotted) {
-        slotted_result res = slotted_explain_congr(lhs, rhs, rws, guides, cfg.rust_config, viz_path);
-        result = (eqsat_result) {
-            .slotted = true,
-            .kind    = 1,
-            .expl    = res.expl,
-            .graph   = { .slotted = res.graph },
-            .rep     = res.rep,
-        };
-    } else {
-        egg_result res = egg_explain_congr(lhs, rhs, rws, guides, blocks, cfg.rust_config, viz_path, e);
-        result = (eqsat_result) {
-            .slotted = false,
-            .kind    = res.kind,
-            .expl    = res.expl,
-            .graph   = { .egg = res.graph },
-            .rep     = res.rep,
-        };
+        slotted_unsupported();
     }
-    
+
+    egg_result res = egg_explain_congr(lhs, rhs, rws, guides, blocks, cfg.rust_config, viz_path, e);
+    eqsat_result result = (eqsat_result) {
+        .kind  = res.kind,
+        .expl  = res.expl,
+        .graph = res.graph,
+        .rep   = res.rep,
+    };
+
     // TODO: Is it safe to free this?
     free_rws_array(rws);
     free(guides.ptr);
@@ -322,7 +268,7 @@ structure Result.Raw where
 */
 lean_obj_res eqsat_result_to_lean(eqsat_result result) {
     lean_object* expl  = lean_mk_string(result.expl);
-    lean_object* graph = egraph_to_lean(result.graph, result.slotted);
+    lean_object* graph = egg_egraph_to_lean(result.graph);
     lean_object* rep   = report_to_lean(result.rep);
 
     lean_object* lean_result = lean_alloc_ctor(0, 3, sizeof(uint8_t));
@@ -361,44 +307,33 @@ extern egg_result egg_query_equiv(
     const char* goal
 );
 
-extern const char* slotted_query_equiv(
-    slotted_egraph graph,
-    const char* init, 
-    const char* goal
-);
-
 lean_obj_res explain_equiv(b_lean_obj_arg graph, uint8_t slotted, lean_obj_arg init, lean_obj_arg goal) {
+    if (slotted != 0) {
+        slotted_unsupported();
+    }
+
     const char* init_c = lean_string_cstr(init);
     const char* goal_c = lean_string_cstr(goal);
-    
-    if (slotted != 0) {
-        slotted_egraph graph_c = to_slotted_egraph(graph);
-        const char* expl = slotted_query_equiv(graph_c, init_c, goal_c);
-        eqsat_result res = (eqsat_result) { .slotted = true, .kind = 1, .expl = expl, .graph = NULL, .rep = 0 };
-        return eqsat_result_to_lean(res);
-    } else {
-        egg_egraph graph_c = to_egg_egraph(graph);
-        egg_result res = egg_query_equiv(graph_c, init_c, goal_c);
-        eqsat_result result = (eqsat_result) {
-            .slotted = false,
-            .kind    = res.kind,
-            .expl    = res.expl,
-            .graph   = { .egg = res.graph },
-            .rep     = res.rep,
-        };
-        return eqsat_result_to_lean(result);
-    }
+    egg_egraph graph_c = to_egg_egraph(graph);
+    egg_result res = egg_query_equiv(graph_c, init_c, goal_c);
+    eqsat_result result = (eqsat_result) {
+        .kind  = res.kind,
+        .expl  = res.expl,
+        .graph = res.graph,
+        .rep   = res.rep,
+    };
+    return eqsat_result_to_lean(result);
 }
 
 extern const char* egg_get_term(egg_egraph graph, size_t enode);
 
 lean_obj_res get_term(b_lean_obj_arg graph, uint8_t slotted, lean_obj_arg node) {
     if (slotted != 0) {
-        exit(1);
-    } else {
-        egg_egraph graph_c = to_egg_egraph(graph);
-        size_t node_c = nat_from_lean_obj(node);
-        const char* term = egg_get_term(graph_c, node_c);
-        return lean_mk_string(term);
+        slotted_unsupported();
     }
+
+    egg_egraph graph_c = to_egg_egraph(graph);
+    size_t node_c = nat_from_lean_obj(node);
+    const char* term = egg_get_term(graph_c, node_c);
+    return lean_mk_string(term);
 }
